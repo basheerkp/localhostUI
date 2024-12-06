@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.sharp.ArrowForward
 import androidx.compose.material3.Icon
@@ -35,8 +37,13 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ahmed.localhostui.ui.theme.Green
+import com.ahmed.localhostui.ui.theme.LightBlue
 import com.ahmed.localhostui.ui.theme.LocalhostUITheme
 import com.ahmed.localhostui.ui.theme.PurpleGrey40
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class FilesList : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,7 +53,6 @@ class FilesList : ComponentActivity() {
             LocalhostUITheme {
                 Scaffold { innerPadding ->
                     val ip = intent.getStringExtra("ip") ?: " "
-                    val urlOld = intent.getStringExtra("urlOld") ?: ""
                     if (ip == " ") {
                         Toast.makeText(LocalContext.current, "No IP entered", Toast.LENGTH_SHORT)
                             .show()
@@ -58,7 +64,7 @@ class FilesList : ComponentActivity() {
                     }
                     val url = intent.getStringExtra("url") ?: ""
 
-                    Results(Modifier.padding(innerPadding), ip, url, urlOld = urlOld)
+                    Results(Modifier.padding(innerPadding), ip, url)
                 }
             }
         }
@@ -73,8 +79,8 @@ fun Results(
     ip: String,
     url: String = "",
     viewModel: ItemsViewModels = viewModel(),
-    urlOld: String
 ) {
+
     val context = LocalContext.current
 
     LaunchedEffect(ip) {
@@ -87,30 +93,45 @@ fun Results(
         CustomRow(
             Modifier, "...",
             onclick = {
+                println(url)
+                val newUrl = url.split("/")
+                val oldUrl = newUrl.slice(0..newUrl.lastIndex - 2).joinToString("/") + "/"
                 val intent = Intent(context, FilesList::class.java)
-                intent.putExtra("url", urlOld)
+                intent.putExtra("url", oldUrl)
                 intent.putExtra("ip", ip)
-                if (url == "") intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP
+                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP
                 context.startActivity(intent)
             },
+            isFile = false,
+            downloader = { },
         )
 
         Spacer(Modifier.height(3.dp))
         if (items.isEmpty()) {
-            CustomRow(Modifier, "No files found ", false) { }
+            CustomRow(Modifier, "No files found ", true, onclick = { }) { }
         } else if (items.first().title == "No permission") {
 
-            CustomRow(Modifier, "run as admin to access this folder ", false) { }
+            CustomRow(Modifier, "run as admin to access this folder ", false, onclick = { }) { }
 
         } else LazyColumn(Modifier.fillMaxHeight()) {
-            items(items.size) { item ->
 
-                CustomRow(Modifier, items[item].title, items[item].isFile, {
+            items(items) { item ->
+
+                val context = LocalContext.current
+
+                CustomRow(Modifier, item.title, item.isFile, onclick = {
                     val intent = Intent(context, FilesList::class.java)
-                    intent.putExtra("url", url + items[item].title)
+                    intent.putExtra("url", url + item.title)
                     intent.putExtra("ip", ip)
                     intent.putExtra("urlOld", url)
                     context.startActivity(intent)
+                }, downloader = {
+                    if (item.isFile) download(
+                        context, "http://$ip:8000/$url${item.title}", item.title
+                    )
+                    else CoroutineScope(Dispatchers.IO).launch() {
+                        getItems(ip, url + item.title, context, item.title)
+                    }
                 })
 
                 Spacer(Modifier.height(3.dp))
@@ -122,7 +143,11 @@ fun Results(
 
 @Composable
 fun CustomRow(
-    modifier: Modifier = Modifier, text: String, clickable: Boolean = false, onclick: () -> Unit
+    modifier: Modifier = Modifier,
+    text: String,
+    isFile: Boolean = false,
+    onclick: () -> Unit,
+    downloader: () -> Unit
 ) {
     val config = LocalConfiguration.current
     val textWidth = config.screenWidthDp * 0.7f
@@ -130,19 +155,21 @@ fun CustomRow(
         modifier
             .background(PurpleGrey40, MaterialTheme.shapes.medium)
             .fillMaxWidth()
+            .border(1.dp, if (isFile) LightBlue else Green, MaterialTheme.shapes.medium)
             .defaultMinSize(minHeight = 45.dp)
             .padding(start = 10.dp)
             .clickable(
-                !clickable, onClick = onclick
+                !isFile, onClick = onclick
             ),
         horizontalArrangement = Arrangement.Absolute.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = if (!clickable) text.slice(0..text.length - 2) else text,
-            Modifier.width(textWidth.dp)
+            text = if (!isFile) text.replace("/", "") else text, Modifier.width(textWidth.dp)
         )
-        if (text != "...") IconButton(onClick = {}) {
+        if (text != "..." && text != "No files found ") IconButton(
+            onClick = downloader
+        ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Sharp.ArrowForward,
                 contentDescription = null,

@@ -22,7 +22,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -42,7 +43,10 @@ android {
 }
 
 dependencies {
-    implementation(libs.khushpanchal.ketch)
+    implementation (libs.kotlinx.coroutines.android.v171)
+
+    implementation (libs.okhttp)
+    implementation (libs.ketch.v202) // Use latest available version
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.jsoup)

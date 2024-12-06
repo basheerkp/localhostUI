@@ -30,3 +30,6 @@ val Olive = Color(0xFF808000)
 val Plum = Color(0xFFDDA0DD)
 
 val Black = Color(0xFF000000)
+val White = Color(0xFFFFFFFF)
+val LightBlue = Color(0xFFADD8E6)
+
